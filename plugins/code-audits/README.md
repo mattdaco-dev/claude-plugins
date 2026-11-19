@@ -7,11 +7,9 @@ report, then proposes fixes one by one and waits for your approval before each o
 ## Install
 
 ```
-/plugin install code-audits --marketplace mattdaco-dev/claude-plugins
+/plugin marketplace add mattdaco-dev/claude-plugins
+/plugin install code-audits@mattdaco
 ```
-
-Or add the marketplace once with `/plugin marketplace add mattdaco-dev/claude-plugins`, then
-`/plugin install code-audits@mattdaco`.
 
 ## Contents
 
@@ -27,7 +25,7 @@ Or add the marketplace once with `/plugin marketplace add mattdaco-dev/claude-pl
 | Skill | `legacy-takeover` | Takes over an unfamiliar codebase: a one-page quick overview with a risk map, or a full assessment with parallel audits, a debt register and a phased roadmap. |
 | Skill | `c4-architecture` | Builds a C4 model in Structurizr DSL from the code, level by level, validates it and exports a static site. |
 | Skill | `dev-server` | Starts the project's dev server and opens Chrome through the Chrome DevTools MCP so Claude can drive the app. |
-| Agent | `auditor` | Read-only collection phase of an audit or maintenance zone; returns the complete report as text. Proposed to you, never launched without your consent. |
+| Agent | `auditor` | Read-only collection phase of an audit or maintenance zone; returns the complete report as text. Proposed to you, never launched without your consent. It has Bash to run the audit tools, so read-only is enforced by its instructions, not by its tool list. |
 
 ## Where reports go
 
@@ -71,8 +69,9 @@ heuristic and record the tool as "not run".
 ## Bundled MCP server
 
 The plugin declares the [Chrome DevTools MCP](https://github.com/ChromeDevTools/chrome-devtools-mcp)
-server in `.mcp.json`, started with `npx -y chrome-devtools-mcp@latest --isolated`, so each session
-gets its own throwaway Chrome profile. `dev-server`, `performance-audit`, `seo-audit`, `gdpr-audit`
+server in `.mcp.json`, started with `npx -y chrome-devtools-mcp@1.12.0 --isolated`, so each session
+gets its own throwaway Chrome profile. The version is pinned: a new npm release does not run on your
+machine until it has been bumped here. `dev-server`, `performance-audit`, `seo-audit`, `gdpr-audit`
 and `c4-architecture` use it. It needs Node.js and Google Chrome. If Node is managed by nvm or a
 similar tool and the server fails to connect, `dev-server` explains how to register it with absolute
 paths.

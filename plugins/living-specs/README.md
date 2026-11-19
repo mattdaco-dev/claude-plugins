@@ -12,11 +12,9 @@ question, never a rule.
 ## Install
 
 ```
-/plugin install living-specs --marketplace mattdaco-dev/claude-plugins
+/plugin marketplace add mattdaco-dev/claude-plugins
+/plugin install living-specs@mattdaco
 ```
-
-Or add the marketplace once with `/plugin marketplace add mattdaco-dev/claude-plugins`, then
-`/plugin install living-specs@mattdaco`.
 
 ## What it maintains
 
@@ -70,6 +68,8 @@ Numbering is global to the project per prefix, and an ID never changes once on t
 ## Agents
 
 - `analyst`: read-only analysis of one feature for `retro-spec`, run in parallel with your agreement.
+  It has Bash (git history, build files), so read-only is enforced by its instructions, not by its
+  tool list.
 - `reviewer`: adversarial read-only review of a ticket, spec, glossary or skill file against its
   template.
 

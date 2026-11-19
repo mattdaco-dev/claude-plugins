@@ -6,11 +6,9 @@ for Claude Code.
 ## Install
 
 ```
-/plugin install dev-workflow --marketplace mattdaco-dev/claude-plugins
+/plugin marketplace add mattdaco-dev/claude-plugins
+/plugin install dev-workflow@mattdaco
 ```
-
-Or add the marketplace once with `/plugin marketplace add mattdaco-dev/claude-plugins`, then
-`/plugin install dev-workflow@mattdaco`.
 
 ## Contents
 
@@ -19,7 +17,7 @@ Or add the marketplace once with `/plugin marketplace add mattdaco-dev/claude-pl
 | Skill | `handover` | Writes or refreshes `HANDOVER.md`, a local resume point for the next session. |
 | Skill | `adr` | Keeps an architecture decision log (one file per decision), reusing an existing register; does nothing without a register or a request. |
 | Agent | `debugger` | Reproduces and diagnoses a bug, failing test or broken build; fixes only if the brief says so. |
-| Agent | `researcher` | Read-only research in code or external docs, returns a sourced conclusion. |
+| Agent | `researcher` | Read-only research in code or external docs, returns a sourced conclusion. It has Bash (git history, CLIs), so read-only is enforced by its instructions, not by its tool list. |
 | Agent | `implementer` | Carries out a bounded coding task on a fixed set of files and reports what it changed and verified. |
 | Hook | `session-handover.sh` (SessionStart) | Injects `HANDOVER.md` from the working directory, with the rules to resume from it and keep it current; silent when there is none. |
 | Hook | `git-guard.py` (PreToolUse on Bash) | Blocks commits on `main`/`master` and commits made while `HANDOVER.md` is stale; can also block `git push`. |
@@ -44,15 +42,18 @@ The three agents exist so that delegated work shows its role in the running-agen
 
 | Setting | Default | Effect |
 |---|---|---|
-| `DEV_WORKFLOW_GUARD_MAIN` | on | `git commit` on `main`/`master` is blocked. Set to `0` to turn the check off everywhere. A branch created earlier in the same command (`git checkout -b`, `git switch -c`) lets the commit through. |
+| `DEV_WORKFLOW_GUARD_MAIN` | on | `git commit` on `main`/`master` is blocked. Set to `0` to turn the check off everywhere. A branch created earlier in the same command (`git checkout -b`, `git switch -c`) lets the commit through; a switch to `main`/`master` earlier in the same command is caught. |
 | `.claude/allow-main-commits` | absent | File at the repo root. When present, commits on the default branch are allowed in that repo only. |
-| `DEV_WORKFLOW_GUARD_HANDOVER` | on | `git commit` is blocked while `HANDOVER.md` (command directory, repo root or session directory) is older than the last commit. Set to `0` to turn it off. No `HANDOVER.md`: no check. |
+| `DEV_WORKFLOW_GUARD_HANDOVER` | on | `git commit` is blocked while `HANDOVER.md` (command directory, repo root, or session directory when it is the same repo) is older than your last commit (`user.email`); commits by others, brought in by a pull, do not count. Set to `0` to turn it off. No `HANDOVER.md`: no check. |
 | `DEV_WORKFLOW_BLOCK_PUSH` | off | Set to `1` to block every `git push`, so Claude commits locally and leaves pushing to you. |
 
 Set the variables in your shell profile or in the `env` block of `settings.json`. Heredoc bodies
 and quoted strings are ignored, so a commit message that quotes a git command triggers nothing.
 When blocking, the hook exits with code 2 and explains why on stderr; on any other input it exits
 with 0.
+
+The guard catches mistakes, it is not a security boundary: since quoted strings are skipped,
+`bash -c "git commit ..."` goes through, and so does a git alias such as `git ci`.
 
 ## Testing the guard
 
@@ -66,4 +67,5 @@ echo '{"cwd":"'"$PWD"'","tool_input":{"command":"git push"}}' \
   | DEV_WORKFLOW_BLOCK_PUSH=1 python3 /path/to/dev-workflow/hooks/git-guard.py; echo $?   # 2
 ```
 
-Exit code 2 means blocked, 0 means allowed.
+Exit code 2 means blocked, 0 means allowed. The automated suite lives in
+`tests/test_git_guard.py` at the repository root (`python3 -m unittest discover -s tests`).

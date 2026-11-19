@@ -20,7 +20,7 @@ Errors (exit 1):
        - paths inside a skill whose first segment is a folder of that skill,
          and ../ paths that lead to a sibling skill, exist,
        - repository paths (plugins/..., scripts/..., Markdown links) exist.
-  6. Shell scripts pass sh -n, Python files compile, JSON files parse.
+  6. Shell scripts pass sh -n (bash -n for a bash shebang), Python files compile, JSON files parse.
   7. Optional denylist: if .denylist.local exists (one word or phrase per
      line, not versioned), no versioned text file may contain those words.
 
@@ -259,9 +259,12 @@ for path in md_files:
 
 # 6. Scripts and JSON -------------------------------------------------------------
 for path in walk_files(ROOT, {".sh"}):
-    result = subprocess.run(["sh", "-n", path], capture_output=True, text=True)
+    with open(path, encoding="utf-8", errors="replace") as f:
+        shebang = f.readline()
+    shell = "bash" if re.match(r"#!.*\bbash\b", shebang) else "sh"
+    result = subprocess.run([shell, "-n", path], capture_output=True, text=True)
     if result.returncode:
-        err(path, "sh -n failed: " + (result.stderr.strip().splitlines() or ["?"])[-1])
+        err(path, f"{shell} -n failed: " + (result.stderr.strip().splitlines() or ["?"])[-1])
 for path in walk_files(ROOT, {".py"}):
     try:
         compile(read(path), path, "exec")

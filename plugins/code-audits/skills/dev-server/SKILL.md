@@ -11,7 +11,7 @@ take screenshots.
 ## 0. Prerequisite: Chrome DevTools MCP
 
 This plugin bundles the Chrome DevTools MCP server (`chrome-devtools`, started with
-`npx -y chrome-devtools-mcp@latest --isolated`). Check that it is available (tools
+`npx -y chrome-devtools-mcp@1.12.0 --isolated`). Check that it is available (tools
 `navigate_page`, `take_snapshot`…) with `claude mcp list` or `/mcp` (expected: `chrome-devtools`
 connected). Google Chrome and Node.js (for `npx`) are required too.
 
@@ -25,7 +25,7 @@ changes the Claude Code config): install globally and point to the **absolute pa
 the script, in a user-scope server.
 
 ```bash
-npm i -g chrome-devtools-mcp
+npm i -g chrome-devtools-mcp@1.12.0                         # same version as .mcp.json
 NODE="$(command -v node)"                                   # e.g. ~/.nvm/versions/node/vX/bin/node
 SCRIPT="$(npm prefix -g)/lib/node_modules/chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js"
 claude mcp add -s user chrome-devtools -- "$NODE" "$SCRIPT" --isolated
