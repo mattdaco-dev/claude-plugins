@@ -1,0 +1,8 @@
+{
+  "name": "code-audits",
+  "version": "0.1.0",
+  "description": "Security, performance, maintainability, GDPR and SEO audits, quarterly maintenance passes, legacy takeover and C4 architecture diagrams.",
+  "author": { "name": "mattdaco-dev" },
+  "license": "MIT",
+  "repository": "https://github.com/mattdaco-dev/claude-plugins"
+}

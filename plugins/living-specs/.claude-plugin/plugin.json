@@ -1,0 +1,8 @@
+{
+  "name": "living-specs",
+  "version": "0.1.0",
+  "description": "Grill a feature, then keep functional specs, screen specs, a business glossary and tickets in sync with the project.",
+  "author": { "name": "mattdaco-dev" },
+  "license": "MIT",
+  "repository": "https://github.com/mattdaco-dev/claude-plugins"
+}

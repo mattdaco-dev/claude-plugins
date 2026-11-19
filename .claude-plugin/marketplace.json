@@ -1,0 +1,29 @@
+{
+  "name": "mattdaco",
+  "owner": { "name": "mattdaco-dev" },
+  "metadata": {
+    "description": "Claude Code plugins by mattdaco-dev: living specs, code audits and a development workflow."
+  },
+  "plugins": [
+    {
+      "name": "living-specs",
+      "source": "./plugins/living-specs",
+      "description": "Grill a feature, then keep functional specs, screen specs, a business glossary and tickets in sync with the project."
+    },
+    {
+      "name": "code-audits",
+      "source": "./plugins/code-audits",
+      "description": "Security, performance, maintainability, GDPR and SEO audits, quarterly maintenance passes, legacy takeover and C4 architecture diagrams."
+    },
+    {
+      "name": "dev-workflow",
+      "source": "./plugins/dev-workflow",
+      "description": "Session handover, architecture decision records, role-named subagents and a configurable git guard."
+    },
+    {
+      "name": "quiet-diffs",
+      "source": { "source": "github", "repo": "mattdaco-dev/claude-quiet-diffs" },
+      "description": "Collapse Edit, Write and shell-command diffs to one line with added and removed counts; ctrl+o still shows the full diff."
+    }
+  ]
+}
