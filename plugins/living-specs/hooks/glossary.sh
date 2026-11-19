@@ -54,9 +54,11 @@ terms=0
 for f in "$@"; do
   printf '\n===== %s =====\n' "${f#"$root"/}"
   cat "$f"
-  # data rows: table lines minus header and separator
-  n=$(grep -c '^|' "$f")
-  if [ "$n" -ge 2 ]; then n=$((n - 2)); fi
+  # data rows: table lines minus one header and one separator per table
+  rows=$(grep -c '^|' "$f")
+  tables=$(grep -cE '^\|[[:space:]]*:?-+:?[[:space:]]*(\|[[:space:]]*:?-+:?[[:space:]]*)*\|?[[:space:]]*$' "$f")
+  n=$((rows - 2 * tables))
+  [ "$n" -ge 0 ] || n=0
   terms=$((terms + n))
 done
 if [ "$terms" -gt 150 ]; then

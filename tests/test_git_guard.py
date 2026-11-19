@@ -108,6 +108,26 @@ class GitGuardTest(unittest.TestCase):
         self.assertEqual(self.run_hook(f"git -C {main} commit -m x", feature), 2)
         self.assertEqual(self.run_hook(f"cd {main} && git commit -m x", feature), 2)
 
+    def test_quoted_branch_name_switch_blocked(self):
+        repo = make_repo(self.tmp)
+        git(repo, "switch", "-q", "-c", "feat/x")
+        self.assertEqual(self.run_hook('git switch "main" && git commit -m x', repo), 2)
+
+    def test_git_dash_c_with_spaces_in_path(self):
+        os.makedirs(os.path.join(self.tmp, "with space"))
+        main = make_repo(os.path.join(self.tmp, "with space"))
+        feature = make_repo(self.tmp, "feature")
+        git(feature, "switch", "-q", "-c", "feat/x")
+        self.assertEqual(self.run_hook(f'git -C "{main}" commit -m x', feature), 2)
+        self.assertEqual(self.run_hook(f'cd "{main}" && git commit -m x', feature), 2)
+
+    def test_cd_inside_quoted_string_ignored(self):
+        main = make_repo(self.tmp, "main-repo")
+        feature = make_repo(self.tmp, "feature")
+        git(feature, "switch", "-q", "-c", "feat/x")
+        cmd = f'echo "done; cd {main}" && git commit -m x'
+        self.assertEqual(self.run_hook(cmd, feature), 0)
+
     # Text that is data, not commands ------------------------------------------
 
     def test_quoted_and_heredoc_text_ignored(self):
@@ -160,6 +180,24 @@ class GitGuardTest(unittest.TestCase):
         repo = self.feature_repo(when=now - 7200)
         touch(os.path.join(repo, "HANDOVER.md"), now - 3600)
         git(repo, "commit", "-q", "--allow-empty", "-m", "pulled", email="other@example.com", when=now)
+        self.assertEqual(self.run_hook("git commit -m x", repo), 0)
+
+    def test_amend_does_not_make_handover_stale(self):
+        now = time.time()
+        repo = self.feature_repo(when=now - 7200)
+        touch(os.path.join(repo, "HANDOVER.md"), now - 3600)
+        # amend: committer date moves to now, author date stays 2 h ago
+        env = dict(os.environ, GIT_COMMITTER_DATE=f"@{int(now)} +0000")
+        subprocess.run(["git", "-C", repo, "commit", "-q", "--amend", "--allow-empty", "-m", "w2"],
+                       check=True, capture_output=True, env=env)
+        self.assertEqual(self.run_hook("git commit -m x", repo), 0)
+
+    def test_no_own_commit_no_check(self):
+        now = time.time()
+        repo = self.feature_repo()
+        git(repo, "commit", "-q", "--amend", "--reset-author", "--allow-empty", "-m", "init",
+            email="other@example.com", when=now)
+        touch(os.path.join(repo, "HANDOVER.md"), now - 3600)
         self.assertEqual(self.run_hook("git commit -m x", repo), 0)
 
     def test_session_handover_ignored_for_other_repo(self):

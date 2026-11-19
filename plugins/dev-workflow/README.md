@@ -35,7 +35,7 @@ The three agents exist so that delegated work shows its role in the running-agen
 3. The file is local: it is never committed and should be listed in `.gitignore` (or
    `.git/info/exclude`). The SessionStart hook warns when git does not ignore it.
 4. The next session starts with the file injected into context and resumes from it.
-5. Before each commit, `git-guard` checks that `HANDOVER.md` is newer than the last commit, so the
+5. Before each commit, `git-guard` checks that `HANDOVER.md` is newer than your last commit, so the
    resume point never lags behind the history.
 
 ## git-guard configuration
@@ -44,13 +44,16 @@ The three agents exist so that delegated work shows its role in the running-agen
 |---|---|---|
 | `DEV_WORKFLOW_GUARD_MAIN` | on | `git commit` on `main`/`master` is blocked. Set to `0` to turn the check off everywhere. A branch created earlier in the same command (`git checkout -b`, `git switch -c`) lets the commit through; a switch to `main`/`master` earlier in the same command is caught. |
 | `.claude/allow-main-commits` | absent | File at the repo root. When present, commits on the default branch are allowed in that repo only. |
-| `DEV_WORKFLOW_GUARD_HANDOVER` | on | `git commit` is blocked while `HANDOVER.md` (command directory, repo root, or session directory when it is the same repo) is older than your last commit (`user.email`); commits by others, brought in by a pull, do not count. Set to `0` to turn it off. No `HANDOVER.md`: no check. |
+| `DEV_WORKFLOW_GUARD_HANDOVER` | on | `git commit` is blocked while `HANDOVER.md` (command directory, repo root, or session directory when it is the same repo) is older than your last commit (author date, matched on `user.email`, among the last 200 commits); commits by others brought in by a pull do not count, and an `--amend` or a rebase keeps the author date.  Set to `0` to turn it off. No `HANDOVER.md`: no check. |
 | `DEV_WORKFLOW_BLOCK_PUSH` | off | Set to `1` to block every `git push`, so Claude commits locally and leaves pushing to you. |
 
 Set the variables in your shell profile or in the `env` block of `settings.json`. Heredoc bodies
 and quoted strings are ignored, so a commit message that quotes a git command triggers nothing.
 When blocking, the hook exits with code 2 and explains why on stderr; on any other input it exits
 with 0.
+
+The hook stops calling git after 8 seconds and lets the command through, inside the 10 second
+timeout set in `hooks.json`.
 
 The guard catches mistakes, it is not a security boundary: since quoted strings are skipped,
 `bash -c "git commit ..."` goes through, and so does a git alias such as `git ci`.

@@ -7,8 +7,9 @@
   (checkout -b, switch -c) lets the commit through, switching to main/master
   does not.
 - git commit while HANDOVER.md (command dir, repo root, or session cwd when
-  it is the same repo) is older than the user's last commit: blocked, unless
-  DEV_WORKFLOW_GUARD_HANDOVER=0. Commits by others (pulled in) do not count.
+  it is the same repo) is older than the author date of the user's last
+  commit: blocked, unless DEV_WORKFLOW_GUARD_HANDOVER=0. Commits by others
+  (pulled in) do not count; an --amend or a rebase keeps the author date.
   No HANDOVER.md found: no check.
 - git push: allowed, unless DEV_WORKFLOW_BLOCK_PUSH=1.
 
@@ -26,15 +27,24 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 
+# One shell word: double-quoted, single-quoted or bare.
+ARG = r"(?:\"[^\"]*\"|'[^']*'|\S+)"
 # "git" as a command word, optional global options, then the subcommand.
-GIT = r"(?:^|[\s;&|(])git(?:\s+(?:-C\s+\S+|-c\s+\S+|--[\w-]+(?:=\S+)?))*\s+"
+GIT = r"(?:^|[\s;&|(])git(?:\s+(?:-[Cc]\s+" + ARG + r"|--[\w-]+(?:=" + ARG + r")?))*\s+"
 PUSH = re.compile(GIT + r"push\b")
 COMMIT = re.compile(GIT + r"commit\b")
 SWITCH = re.compile(GIT + r"(checkout|switch)\b([^;&|\n)]*)")
 CREATE_FLAGS = {"-b", "-B", "-c", "-C", "--orphan", "--create", "--force-create"}
 DEFAULT_BRANCHES = {"main", "master"}
 MAIN_COMMITS_MARKER = os.path.join(".claude", "allow-main-commits")
+# hooks.json gives the hook 10 s: stop calling git after 8 s and let the
+# command through rather than being killed by the timeout.
+DEADLINE = time.monotonic() + 8
+# Commits scanned to find the user's last one: bounds the walk on a large
+# repository where the user has not committed recently.
+OWN_COMMIT_WINDOW = 200
 
 
 def env_flag(name, default):
@@ -53,44 +63,73 @@ def block(message):
 
 
 def strip_text(command):
-    """Drop heredoc bodies and quoted strings, which are data, not commands."""
+    """Blank heredoc bodies and quoted strings, which are data, not commands.
+
+    Same length as the input, quotes kept: a match position in the result
+    points at the same text in the raw command, so arguments can be read
+    back from it.
+    """
+    def blank(match):
+        return re.sub(r"[^\n]", " ", match.group(0))
+
+    def blank_inside(match):
+        text = match.group(0)
+        return text[0] + " " * (len(text) - 2) + text[-1]
+
     command = re.sub(
         r"<<-?\s*(['\"]?)(\w+)\1[^\n]*\n.*?\n\s*\2\s*(?:\n|$)",
-        "\n",
+        blank,
         command,
         flags=re.S,
     )
-    return re.sub(r"'[^']*'|\"(?:\\.|[^\"\\])*\"", "''", command)
+    return re.sub(r"'[^']*'|\"(?:\\.|[^\"\\])*\"", blank_inside, command)
 
 
-def target_dir(command, cwd):
-    """Directory the git command runs in: last `cd X` before it, or `git -C X`."""
-    head = COMMIT.split(command, maxsplit=1)[0]
+def first_word(raw, start, end):
+    """First shell word of raw[start:end], quotes removed."""
+    try:
+        parts = shlex.split(raw[start:end])
+    except ValueError:
+        return None
+    return parts[0] if parts else None
+
+
+def target_dir(raw, command, cwd):
+    """Directory the git command runs in: last `cd X` before it, or `git -C X`.
+
+    `command` is strip_text(raw): matches are found there, so a `cd` inside a
+    quoted string is ignored, and the argument is read back from `raw`.
+    """
+    commit = COMMIT.search(command)
+    head_end = commit.start() if commit else len(command)
     directory = cwd
-    for match in re.finditer(r"(?:^|[;&|(])\s*cd\s+([^;&|)]+)", head):
-        try:
-            parts = shlex.split(match.group(1))
-        except ValueError:
-            continue
-        if parts:
-            directory = os.path.join(directory, os.path.expanduser(parts[0]))
-    c_flag = re.search(r"git\s+-C\s+(\S+)[^;&|]*\bcommit\b", command)
+    for match in re.finditer(r"(?:^|[;&|(])\s*cd\s+([^;&|)]+)", command[:head_end]):
+        word = first_word(raw, *match.span(1))
+        if word:
+            directory = os.path.join(directory, os.path.expanduser(word))
+    c_flag = re.search(r"git\s+-C\s+(" + ARG + r")[^;&|]*\bcommit\b", command)
     if c_flag:
-        directory = os.path.join(directory, os.path.expanduser(c_flag.group(1).strip("'\"")))
+        word = first_word(raw, *c_flag.span(1))
+        if word:
+            directory = os.path.join(directory, os.path.expanduser(word))
     return os.path.normpath(directory)
 
 
 def git(directory, *args):
+    remaining = DEADLINE - time.monotonic()
+    if remaining <= 0:
+        return None
     try:
         result = subprocess.run(
-            ["git", "-C", directory, *args], capture_output=True, text=True, timeout=5
+            ["git", "-C", directory, *args],
+            capture_output=True, text=True, timeout=min(5, remaining),
         )
     except (OSError, subprocess.SubprocessError):
         return None
     return result.stdout.strip() if result.returncode == 0 else None
 
 
-def branch_after_switch(head, current):
+def branch_after_switch(raw, head, current):
     """Branch the commit lands on, given the checkout/switch calls before it.
 
     Returns (branch, created): created is True when the last relevant call
@@ -100,7 +139,7 @@ def branch_after_switch(head, current):
     branch, created = current, False
     for match in SWITCH.finditer(head):
         try:
-            args = shlex.split(match.group(2))
+            args = shlex.split(raw[match.start(2):match.end(2)])
         except ValueError:
             continue
         if "--" in args:
@@ -114,6 +153,7 @@ def branch_after_switch(head, current):
         if targets and targets[0] in DEFAULT_BRANCHES:
             branch, created = targets[0], False
     return branch, created
+
 
 def find_handover(directory, cwd):
     """HANDOVER.md in the command's directory, the repo root or the session cwd.
@@ -131,12 +171,25 @@ def find_handover(directory, cwd):
             return os.path.join(base, "HANDOVER.md")
     return None
 
+
 def last_own_commit(directory):
-    """Timestamp of the last commit by the configured user (all commits if unset)."""
+    """Author timestamp of the user's last commit, or None.
+
+    Author date, not committer date: an --amend or a rebase rewrites the
+    commit but keeps its author date, so it does not make HANDOVER.md stale.
+    Only commits by the configured user.email count (commits pulled from
+    others do not), searched among the last OWN_COMMIT_WINDOW commits. No
+    user.email: the last commit, whoever made it.
+    """
     email = git(directory, "config", "user.email")
-    if email:
-        return git(directory, "log", "-1", "--fixed-strings", f"--author=<{email}>", "--format=%ct")
-    return git(directory, "log", "-1", "--format=%ct")
+    if not email:
+        return git(directory, "log", "-1", "--format=%at")
+    log = git(directory, "log", f"-{OWN_COMMIT_WINDOW}", "--format=%ae %at")
+    for line in (log or "").splitlines():
+        author, _, stamp = line.rpartition(" ")
+        if author.lower() == email.lower():
+            return stamp
+    return None
 
 
 def main():
@@ -164,13 +217,14 @@ def main():
     if not COMMIT.search(command):
         return
 
-    directory = target_dir(raw, cwd)
+    directory = target_dir(raw, command, cwd)
     if not os.path.isdir(directory):
         return
 
     if env_flag("DEV_WORKFLOW_GUARD_MAIN", True):
         branch, created = branch_after_switch(
-            COMMIT.split(command, maxsplit=1)[0],
+            raw,
+            command[:COMMIT.search(command).start()],
             git(directory, "symbolic-ref", "--short", "HEAD"),
         )
         root = git(directory, "rev-parse", "--show-toplevel")

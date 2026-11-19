@@ -125,7 +125,10 @@
     };
     if (def.groups) def.groups.forEach(function (g) { var og = el('optgroup', { label: g.label }); add(og, g.options); s.appendChild(og); });
     else add(s, def.options || []);
-    s.addEventListener('change', function () { if (def.onChange) def.onChange(s.value); });
+    s.addEventListener('change', function () {
+      update(def.id, s.value);
+      if (def.onChange) def.onChange(s.value);
+    });
     controls[def.id] = { def: def, node: s };
     return el('label', { class: 'pb-field' }, [el('span', { class: 'pb-label', text: def.label }), s]);
   }
