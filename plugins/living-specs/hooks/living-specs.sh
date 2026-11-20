@@ -3,33 +3,9 @@
 # specs (docs/specs/README.md with "format: living-specs") and, when it does, how to maintain them.
 # Silent when the project declined the format, or when it does not look like an application.
 
-input=$(cat 2>/dev/null)
-dir=""
-if command -v jq >/dev/null 2>&1; then
-  dir=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null)
-fi
-[ -n "$dir" ] || dir=$(printf '%s' "$input" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
-[ -n "$dir" ] && [ -d "$dir" ] || dir=$PWD
-root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || root=$dir
-
-for f in CLAUDE.local.md CLAUDE.md .claude/CLAUDE.md; do
-  grep -qiE '^[[:space:]]*living-specs:[[:space:]]*declined' "$root/$f" 2>/dev/null && exit 0
-done
-
-# A project looks like an application when it has a build or dependency manifest, or an HTML
-# prototype at its root. Plugin and tooling repositories are left alone.
-is_app() {
-  [ -d "$root/.claude-plugin" ] && return 1
-  for m in package.json pom.xml build.gradle build.gradle.kts settings.gradle pyproject.toml \
-           setup.py requirements.txt go.mod Cargo.toml composer.json Gemfile mix.exs \
-           pubspec.yaml deno.json index.html; do
-    [ -f "$root/$m" ] && return 0
-  done
-  for m in "$root"/*.csproj "$root"/*.sln; do
-    [ -f "$m" ] && return 0
-  done
-  return 1
-}
+. "$(dirname "$0")/lib.sh"
+read_root
+declined living-specs && exit 0
 
 readme="$root/docs/specs/README.md"
 

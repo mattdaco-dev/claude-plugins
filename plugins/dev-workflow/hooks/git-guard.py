@@ -33,8 +33,9 @@ import time
 ARG = r"(?:\"[^\"]*\"|'[^']*'|\S+)"
 # "git" as a command word, optional global options, then the subcommand.
 GIT = r"(?:^|[\s;&|(])git(?:\s+(?:-[Cc]\s+" + ARG + r"|--[\w-]+(?:=" + ARG + r")?))*\s+"
-PUSH = re.compile(GIT + r"push\b")
-COMMIT = re.compile(GIT + r"commit\b")
+# (?![\w-]): "commit" but not "commit-tree" or "commit-graph".
+PUSH = re.compile(GIT + r"push(?![\w-])")
+COMMIT = re.compile(GIT + r"commit(?![\w-])")
 SWITCH = re.compile(GIT + r"(checkout|switch)\b([^;&|\n)]*)")
 CREATE_FLAGS = {"-b", "-B", "-c", "-C", "--orphan", "--create", "--force-create"}
 DEFAULT_BRANCHES = {"main", "master"}
@@ -240,8 +241,8 @@ def main():
 
     if env_flag("DEV_WORKFLOW_GUARD_HANDOVER", True):
         handover = find_handover(directory, cwd)
-        last_commit = last_own_commit(directory)
-        if handover and last_commit and os.path.getmtime(handover) < int(last_commit):
+        last_commit = last_own_commit(directory) if handover else None
+        if last_commit and os.path.getmtime(handover) < int(last_commit):
             block(
                 f"{handover} has not been updated since the last commit: refresh "
                 "it (handover skill), then commit again. To turn this check off, "

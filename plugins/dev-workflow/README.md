@@ -3,6 +3,10 @@
 Session handover, architecture decision records, role-named subagents and a configurable git guard
 for Claude Code.
 
+## Requirements
+
+`python3` (3.9 or later) for `git-guard`, `sh` and `git` for the hooks. `jq` is used if present.
+
 ## Install
 
 ```
@@ -34,7 +38,10 @@ The three agents exist so that delegated work shows its role in the running-agen
    risky operation, overwriting it each time.
 3. The file is local: it is never committed and should be listed in `.gitignore` (or
    `.git/info/exclude`). The SessionStart hook warns when git does not ignore it.
-4. The next session starts with the file injected into context and resumes from it.
+4. The next session starts with the file injected into context and resumes from it, framed as
+   working notes that cannot override you. Above 30,000 bytes (`HANDOVER_MAX_BYTES`) it is
+   truncated. A `HANDOVER.md` tracked by git came with the repository, possibly from someone else:
+   it is not injected, Claude only says it is there.
 5. Before each commit, `git-guard` checks that `HANDOVER.md` is newer than your last commit, so the
    resume point never lags behind the history.
 

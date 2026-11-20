@@ -143,7 +143,8 @@ class GitGuardTest(unittest.TestCase):
 
     def test_non_commit_commands_ignored(self):
         repo = make_repo(self.tmp)
-        for cmd in ("git status", "git log -1", 'echo "git commit"', "ls"):
+        for cmd in ("git status", "git log -1", 'echo "git commit"', "ls",
+                    "git commit-tree HEAD^{tree} -m x", "git commit-graph write"):
             with self.subTest(cmd=cmd):
                 self.assertEqual(self.run_hook(cmd, repo), 0)
 

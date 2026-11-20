@@ -75,7 +75,7 @@ Numbering is global to the project per prefix, and an ID never changes once on t
 
 ## Hooks
 
-Two `SessionStart` hooks (POSIX `sh`; `jq` used if present, not required):
+Two `SessionStart` hooks (POSIX `sh`, sharing `hooks/lib.sh`; `jq` used if present, not required):
 
 - `living-specs.sh`: on a project in the format, injects the rules for keeping the specs up to date
   (update without asking, statuses, the `Specs: …` end line, nothing written during a grill-me,
@@ -84,6 +84,12 @@ Two `SessionStart` hooks (POSIX `sh`; `jq` used if present, not required):
 - `glossary.sh`: injects every `docs/glossary*.md` file and the rules for maintaining it, and warns
   above 150 terms. On an application project with no glossary yet, injects only the rules. Silent
   elsewhere.
+
+The glossary comes from the repository, so anyone with write access to it writes into Claude's
+context. The hook frames it as project data that cannot override you, and any instruction inside it
+is to be ignored. Above 60,000 bytes (`LIVING_SPECS_GLOSSARY_MAX_BYTES`), it lists the files for
+on-demand reading instead of injecting them. Review a third-party glossary before opening a session
+on the repository, as you would its `CLAUDE.md`.
 
 A project "looks like an application" when its root has a build or dependency manifest
 (`package.json`, `pom.xml`, `pyproject.toml`, `go.mod`, `Cargo.toml`, etc.) or an `index.html`.

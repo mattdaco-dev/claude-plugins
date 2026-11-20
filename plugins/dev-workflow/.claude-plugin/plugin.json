@@ -1,6 +1,6 @@
 {
   "name": "dev-workflow",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Session handover, architecture decision records, role-named subagents and a configurable git guard.",
   "author": { "name": "mattdaco-dev" },
   "license": "MIT",
