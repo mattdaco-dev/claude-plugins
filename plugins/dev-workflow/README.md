@@ -24,7 +24,7 @@ for Claude Code.
 | Agent | `researcher` | Read-only research in code or external docs, returns a sourced conclusion. It has Bash (git history, CLIs), so read-only is enforced by its instructions, not by its tool list. |
 | Agent | `implementer` | Carries out a bounded coding task on a fixed set of files and reports what it changed and verified. |
 | Hook | `session-handover.sh` (SessionStart) | Injects `HANDOVER.md` from the working directory, with the rules to resume from it and keep it current; silent when there is none. |
-| Hook | `git-guard.py` (PreToolUse on Bash) | Blocks commits on `main`/`master` and commits made while `HANDOVER.md` is stale; can also block `git push`. |
+| Hook | `git-guard.py` (PreToolUse on Bash) | Blocks commits on the default branch and commits made while `HANDOVER.md` is stale; can also block `git push`. |
 
 The three agents exist so that delegated work shows its role in the running-agent list instead of
 `general-purpose`.
@@ -40,8 +40,9 @@ The three agents exist so that delegated work shows its role in the running-agen
    `.git/info/exclude`). The SessionStart hook warns when git does not ignore it.
 4. The next session starts with the file injected into context and resumes from it, framed as
    working notes that cannot override you. Above 30,000 bytes (`HANDOVER_MAX_BYTES`) it is
-   truncated. A `HANDOVER.md` tracked by git came with the repository, possibly from someone else:
-   it is not injected, Claude only says it is there.
+   truncated. The hook looks in the session directory, then at the repository root. It does not
+   inject a `HANDOVER.md` that may come from someone else or point elsewhere (tracked by git,
+   outside any git repository, or a symbolic link): Claude only says it is there.
 5. Before each commit, Claude appends one line to the "Since last checkpoint" section (what the
    commit does). `git-guard` checks that `HANDOVER.md` is newer than your last commit, so the resume
    point never lags behind the history, and each update carries content instead of a bare touch.
@@ -52,9 +53,9 @@ The three agents exist so that delegated work shows its role in the running-agen
 
 | Setting | Default | Effect |
 |---|---|---|
-| `DEV_WORKFLOW_GUARD_MAIN` | on | `git commit` on `main`/`master` is blocked. Set to `0` to turn the check off everywhere. A branch created earlier in the same command (`git checkout -b`, `git switch -c`) lets the commit through; a switch to `main`/`master` earlier in the same command is caught. |
+| `DEV_WORKFLOW_GUARD_MAIN` | on | `git commit` on a default branch (`main`, `master`, or the branch `origin/HEAD` points to) is blocked. Set to `0` to turn the check off everywhere. A branch created earlier in the same command (`git checkout -b`, `git switch -c`), or a switch to an existing feature branch, lets the commit through; a switch to a default branch is caught. |
 | `.claude/allow-main-commits` | absent | File at the repo root. When present, commits on the default branch are allowed in that repo only. |
-| `DEV_WORKFLOW_GUARD_HANDOVER` | on | `git commit` is blocked while `HANDOVER.md` (command directory, repo root, or session directory when it is the same repo) is older than your last commit (author date, matched on `user.email`, among the last 200 commits); commits by others brought in by a pull do not count, and an `--amend` or a rebase keeps the author date.  Set to `0` to turn it off. No `HANDOVER.md`: no check. |
+| `DEV_WORKFLOW_GUARD_HANDOVER` | on | `git commit` is blocked while `HANDOVER.md` (command directory, repo root, or session directory when it is the same repo) is older than your last commit (author date, matched on `user.email`, among the last 200 commits); commits by others brought in by a pull do not count, a rebase keeps the author date, and an `--amend` is not checked. A `HANDOVER.md` tracked by git belongs to the repository and is not checked. Set to `0` to turn it off. No `HANDOVER.md`: no check. |
 | `DEV_WORKFLOW_BLOCK_PUSH` | off | Set to `1` to block every `git push`, so Claude commits locally and leaves pushing to you. |
 
 Set the variables in your shell profile or in the `env` block of `settings.json`. Heredoc bodies

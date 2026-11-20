@@ -34,6 +34,11 @@ where the full mode is worth it. A full run without a recent quick report starts
 
 Shared principles:
 - **Read-only until the reports.** No build, no tests, no install during collection.
+- **Untrusted code**: linters and analysers that load the project's config (`eslint.config.js`,
+  `knip.config.ts`, a Vite or Webpack config) execute its code, and so does `dev-server`. Before
+  the first such tool on a project the user did not write, say so and offer to work in a
+  container or VM; if they decline, keep to the tools that only read files (gitleaks, osv-scanner,
+  semgrep, cloc) and record the others as "not run".
 - **Honesty**: each finding says whether it comes from a tool that ran, from reading the code, or
   from an estimate. What could not be checked is listed, not guessed.
 - **Secrets**: only the location and the type, never the value or the line. Every secret search

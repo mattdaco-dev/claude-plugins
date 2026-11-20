@@ -20,6 +20,10 @@ Living specs (living-specs plugin): project $root keeps its functional and scree
 MSG
 elif [ -f "$readme" ] && grep -q '^moved_to:' "$readme"; then
   target=$(sed -n 's/^moved_to:[[:space:]]*//p' "$readme" | head -n 1)
+  # The value comes from the repository: pass it on only if it looks like a path or a URL.
+  case $target in
+    *[!A-Za-z0-9._/~:@+-]*|'') target='(unreadable value, see docs/specs/README.md)' ;;
+  esac
   printf 'Living specs (living-specs plugin): the specs of project %s moved to %s (docs/specs/README.md, moved_to). Do not write specs here.\n' "$root" "$target"
 elif [ -d "$root/docs/specs" ]; then
   printf 'Living specs (living-specs plugin): project %s has a docs/specs/ outside the living-specs format. When the session touches functional work (behavior, rules, screens), offer the migration once in the session (functional-spec skill, section 5: migrate, not now, never). After a grill-me on a feature, offer to formalize it with functional-spec.\n' "$root"

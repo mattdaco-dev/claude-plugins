@@ -55,6 +55,10 @@ is missing, they offer to install it outside the audited project (`brew`, `pipx`
 a one-off `npx --yes`), never as a project dependency. If you decline, they fall back to a
 heuristic and record the tool as "not run".
 
+Some tools execute the audited project's code: ESLint, knip or madge load its config files, and
+`dev-server` runs its scripts. On code you do not trust (a takeover, a third-party repository), run
+the audit in a container or VM. `legacy-takeover` asks before the first such tool.
+
 | Skill | Tools used when present |
 |---|---|
 | `security-audit` | native audits (`npm audit`, `pnpm audit`, `cargo audit`, `pip-audit`, `bundle audit`, `govulncheck`), `osv-scanner`, `gitleaks` (or `trufflehog`), `semgrep` |

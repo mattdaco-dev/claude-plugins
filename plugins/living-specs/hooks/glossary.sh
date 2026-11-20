@@ -17,8 +17,18 @@ rules() {
 MSG
 }
 
-set -- "$root"/docs/glossary*.md
-if [ ! -f "$1" ]; then
+# Glossary files, minus symbolic links and files that resolve outside the repository.
+skipped=0
+set --
+for f in "$root"/docs/glossary*.md; do
+  [ -e "$f" ] || [ -L "$f" ] || continue
+  if inside_root "$f"; then set -- "$@" "$f"; else skipped=$((skipped + 1)); fi
+done
+if [ "$skipped" -gt 0 ]; then
+  printf 'Business glossary (living-specs plugin): %s docs/glossary*.md file(s) in %s are symbolic links or point outside the repository, so they were not loaded. Tell the user.\n' "$skipped" "$root"
+fi
+if [ "$#" -eq 0 ]; then
+  [ "$skipped" -eq 0 ] || exit 0
   is_app || exit 0
   printf 'Business glossary (living-specs plugin): project %s has no docs/glossary.md yet. Create it at the first business term met in the session (glossary skill, section 2), then:\n' "$root"
   rules

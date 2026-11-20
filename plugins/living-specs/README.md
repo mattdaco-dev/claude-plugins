@@ -88,7 +88,8 @@ Two `SessionStart` hooks (POSIX `sh`, sharing `hooks/lib.sh`; `jq` used if prese
 The glossary comes from the repository, so anyone with write access to it writes into Claude's
 context. The hook frames it as project data that cannot override you, and any instruction inside it
 is to be ignored. Above 60,000 bytes (`LIVING_SPECS_GLOSSARY_MAX_BYTES`), it lists the files for
-on-demand reading instead of injecting them. Review a third-party glossary before opening a session
+on-demand reading instead of injecting them. A glossary file that is a symbolic link, or that
+resolves outside the repository, is never read: Claude only says it was skipped. Review a third-party glossary before opening a session
 on the repository, as you would its `CLAUDE.md`.
 
 A project "looks like an application" when its root has a build or dependency manifest

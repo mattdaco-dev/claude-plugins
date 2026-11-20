@@ -17,6 +17,16 @@ read_root() {
   root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || root=$dir
 }
 
+# Succeed when $1 is a regular file inside $root and not a symbolic link: a versioned link could
+# point to a secret elsewhere on the machine, which the hook would then inject.
+inside_root() {
+  [ -f "$1" ] && [ ! -L "$1" ] || return 1
+  real_dir=$(cd "$(dirname "$1")" 2>/dev/null && pwd -P) || return 1
+  real_root=$(cd "$root" 2>/dev/null && pwd -P) || return 1
+  case "$real_dir/" in "$real_root"/*) return 0 ;; esac
+  return 1
+}
+
 # Succeed when the project opted out with "<key>: declined" in one of its CLAUDE files.
 declined() {
   for f in CLAUDE.local.md CLAUDE.md .claude/CLAUDE.md; do

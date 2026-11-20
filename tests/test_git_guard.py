@@ -91,6 +91,20 @@ class GitGuardTest(unittest.TestCase):
         git(repo, "switch", "-q", "-c", "feat/x")
         self.assertEqual(self.run_hook("git checkout -- main && git commit -m x", repo), 0)
 
+    def test_switch_to_existing_feature_branch_allowed(self):
+        repo = make_repo(self.tmp)
+        git(repo, "branch", "feat/x")
+        self.assertEqual(self.run_hook("git checkout feat/x && git commit -m x", repo), 0)
+        self.assertEqual(self.run_hook("git switch feat/x && git commit -m x", repo), 0)
+
+    def test_remote_default_branch_blocked(self):
+        repo = make_repo(self.tmp, branch="develop")
+        git(repo, "update-ref", "refs/remotes/origin/develop", "HEAD")
+        git(repo, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/develop")
+        self.assertEqual(self.run_hook("git commit -m x", repo), 2)
+        other = make_repo(self.tmp, "other", branch="develop")
+        self.assertEqual(self.run_hook("git commit -m x", other), 0)
+
     def test_marker_allows_main(self):
         repo = make_repo(self.tmp)
         os.makedirs(os.path.join(repo, ".claude"))
@@ -191,6 +205,21 @@ class GitGuardTest(unittest.TestCase):
         env = dict(os.environ, GIT_COMMITTER_DATE=f"@{int(now)} +0000")
         subprocess.run(["git", "-C", repo, "commit", "-q", "--amend", "--allow-empty", "-m", "w2"],
                        check=True, capture_output=True, env=env)
+        self.assertEqual(self.run_hook("git commit -m x", repo), 0)
+
+    def test_amend_not_checked(self):
+        now = time.time()
+        repo = self.feature_repo(when=now)
+        touch(os.path.join(repo, "HANDOVER.md"), now - 3600)
+        self.assertEqual(self.run_hook("git commit --amend --no-edit", repo), 0)
+        self.assertEqual(self.run_hook("git commit -m x", repo), 2)
+
+    def test_tracked_handover_not_checked(self):
+        now = time.time()
+        repo = self.feature_repo()
+        touch(os.path.join(repo, "HANDOVER.md"), now - 3600)
+        git(repo, "add", "HANDOVER.md")
+        git(repo, "commit", "-q", "-m", "team handover", when=now)
         self.assertEqual(self.run_hook("git commit -m x", repo), 0)
 
     def test_no_own_commit_no_check(self):

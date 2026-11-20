@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """PreToolUse hook (matcher: Bash) guarding git commands. Configurable.
 
-- git commit on the default branch (main/master): blocked, unless the repo
-  holds a .claude/allow-main-commits marker, or DEV_WORKFLOW_GUARD_MAIN=0.
-  A checkout/switch earlier in the same command counts: creating a branch
-  (checkout -b, switch -c) lets the commit through, switching to main/master
-  does not.
+- git commit on a default branch (main, master, or the branch origin/HEAD
+  points to): blocked, unless the repo holds a .claude/allow-main-commits
+  marker, or DEV_WORKFLOW_GUARD_MAIN=0. A checkout/switch earlier in the
+  same command counts: creating a branch (checkout -b, switch -c) or
+  switching to an existing feature branch lets the commit through,
+  switching to a default branch does not.
 - git commit while HANDOVER.md (command dir, repo root, or session cwd when
   it is the same repo) is older than the author date of the user's last
   commit: blocked, unless DEV_WORKFLOW_GUARD_HANDOVER=0. Commits by others
-  (pulled in) do not count; an --amend or a rebase keeps the author date.
+  (pulled in) do not count; an --amend or a rebase keeps the author date,
+  and an --amend is never checked. A HANDOVER.md tracked by git is not
+  checked either: it is the repository's file, not the user's notes.
   No HANDOVER.md found: no check.
 - git push: allowed, unless DEV_WORKFLOW_BLOCK_PUSH=1.
 
@@ -130,12 +133,30 @@ def git(directory, *args):
     return result.stdout.strip() if result.returncode == 0 else None
 
 
-def branch_after_switch(raw, head, current):
+def default_branches(directory):
+    """main, master, and the remote's default branch (origin/HEAD) if known."""
+    names = set(DEFAULT_BRANCHES)
+    remote_head = git(directory, "symbolic-ref", "--short", "refs/remotes/origin/HEAD")
+    if remote_head and "/" in remote_head:
+        names.add(remote_head.split("/", 1)[1])
+    return names
+
+
+def is_branch(directory, name):
+    """True when name is a local branch, or a remote one that checkout would track."""
+    return any(
+        git(directory, "rev-parse", "--verify", "--quiet", ref) is not None
+        for ref in (f"refs/heads/{name}", f"refs/remotes/origin/{name}")
+    )
+
+
+def branch_after_switch(raw, head, current, directory, defaults):
     """Branch the commit lands on, given the checkout/switch calls before it.
 
     Returns (branch, created): created is True when the last relevant call
-    creates a branch. A checkout of a path or of an unknown ref leaves the
-    current branch unchanged, except a switch to main/master.
+    creates a branch. A switch to a default branch or to an existing branch
+    moves the commit there; a checkout of a path or of an unknown ref leaves
+    the current branch unchanged.
     """
     branch, created = current, False
     for match in SWITCH.finditer(head):
@@ -151,7 +172,7 @@ def branch_after_switch(raw, head, current):
             branch, created = (rest[0] if rest else None), True
             continue
         targets = [a for a in args if not a.startswith("-")]
-        if targets and targets[0] in DEFAULT_BRANCHES:
+        if targets and (targets[0] in defaults or is_branch(directory, targets[0])):
             branch, created = targets[0], False
     return branch, created
 
@@ -171,6 +192,12 @@ def find_handover(directory, cwd):
         if base and os.path.isfile(os.path.join(base, "HANDOVER.md")):
             return os.path.join(base, "HANDOVER.md")
     return None
+
+
+def is_tracked(path):
+    """True when git tracks the file: it belongs to the repository, not to you."""
+    directory, name = os.path.split(path)
+    return git(directory, "ls-files", "--error-unmatch", name) is not None
 
 
 def last_own_commit(directory):
@@ -222,15 +249,21 @@ def main():
     if not os.path.isdir(directory):
         return
 
+    commit = COMMIT.search(command)
+    commit_args = re.split(r"[;&|\n]", command[commit.end():], maxsplit=1)[0]
+
     if env_flag("DEV_WORKFLOW_GUARD_MAIN", True):
+        defaults = default_branches(directory)
         branch, created = branch_after_switch(
             raw,
-            command[:COMMIT.search(command).start()],
+            command[:commit.start()],
             git(directory, "symbolic-ref", "--short", "HEAD"),
+            directory,
+            defaults,
         )
         root = git(directory, "rev-parse", "--show-toplevel")
         allows_main = root and os.path.isfile(os.path.join(root, MAIN_COMMITS_MARKER))
-        if branch in DEFAULT_BRANCHES and not created and not allows_main:
+        if branch in defaults and not created and not allows_main:
             block(
                 f"Commit on '{branch}' is blocked: create a <type>/<slug> branch "
                 "first (for example feat/my-change), then commit there. To allow "
@@ -239,8 +272,13 @@ def main():
                 "DEV_WORKFLOW_GUARD_MAIN=0."
             )
 
-    if env_flag("DEV_WORKFLOW_GUARD_HANDOVER", True):
+    # --amend rewrites the last commit instead of adding one: no new line due.
+    amend = re.search(r"(?:^|\s)--amend\b", commit_args)
+    if env_flag("DEV_WORKFLOW_GUARD_HANDOVER", True) and not amend:
         handover = find_handover(directory, cwd)
+        # A HANDOVER.md tracked by git is the team's file, not the user's notes.
+        if handover and is_tracked(handover):
+            handover = None
         last_commit = last_own_commit(directory) if handover else None
         if last_commit and os.path.getmtime(handover) < int(last_commit):
             block(
