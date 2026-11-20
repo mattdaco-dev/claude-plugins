@@ -8,7 +8,7 @@ a small interface mod.
 | [`living-specs`](plugins/living-specs) | Grill a feature until it is settled, then write and maintain functional specs, screen specs, a business glossary and tickets that stay in sync with the project. |
 | [`code-audits`](plugins/code-audits) | Security, performance, maintainability, GDPR and SEO audits with dated, prioritised reports; quarterly maintenance passes; legacy takeover; C4 architecture diagrams. |
 | [`dev-workflow`](plugins/dev-workflow) | Session handover file, architecture decision records, role-named subagents and a configurable git guard. |
-| [`quiet-diffs`](https://github.com/mattdaco-dev/claude-quiet-diffs) (mod) | Collapse file-edit diffs to one line. Lives in its own repository, listed here for convenience. |
+| [`quiet-diffs`](https://github.com/mattdaco-dev/claude-quiet-diffs) (mod) | Collapse file-edit diffs to one line. Lives in its own repository, listed here for convenience and pinned to a reviewed commit: a new version reaches you only once its commit is bumped here. |
 
 ## Install
 

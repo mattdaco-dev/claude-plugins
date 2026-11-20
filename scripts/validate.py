@@ -4,7 +4,8 @@
 Errors (exit 1):
   1. Marketplace: .claude-plugin/marketplace.json parses, plugin names are
      unique, every local source folder exists and holds a
-     .claude-plugin/plugin.json whose name matches, with a semver version.
+     .claude-plugin/plugin.json whose name matches, with a semver version;
+     every external source (github, git, url) is pinned by a 40-character sha.
   2. Skills: plugins/<p>/skills/<dir>/SKILL.md exists, frontmatter parses,
      name equals the folder, kebab-case (64 chars max), description present
      and at most 1024 characters.
@@ -120,7 +121,13 @@ for entry in market.get("plugins", []):
     seen.add(name)
     source = entry.get("source")
     if not isinstance(source, str):
-        continue  # external plugin (github, git, url): not checked here
+        # External plugin (github, git, url): its code is not checked here, so
+        # it must be pinned to a reviewed commit.
+        sha = source.get("sha", "") if isinstance(source, dict) else ""
+        if not re.fullmatch(r"[0-9a-f]{40}", str(sha)):
+            err(market_path, f"plugin '{name}': external source without a full 40-character "
+                "sha; pin it to a reviewed commit")
+        continue
     folder = os.path.normpath(os.path.join(ROOT, source))
     manifest = os.path.join(folder, ".claude-plugin", "plugin.json")
     if not os.path.isfile(manifest):

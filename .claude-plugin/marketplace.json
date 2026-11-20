@@ -22,7 +22,11 @@
     },
     {
       "name": "quiet-diffs",
-      "source": { "source": "github", "repo": "mattdaco-dev/claude-quiet-diffs" },
+      "source": {
+        "source": "github",
+        "repo": "mattdaco-dev/claude-quiet-diffs",
+        "sha": "9258776a8b5c7a7bc17b103519c72514d5740e67"
+      },
       "description": "Collapse Edit, Write and shell-command diffs to one line with added and removed counts; ctrl+o still shows the full diff."
     }
   ]
