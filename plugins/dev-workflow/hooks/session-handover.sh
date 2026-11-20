@@ -35,8 +35,8 @@ skip() {
 }
 [ -L "$file" ] && skip "is a symbolic link"
 [ -n "$root" ] || skip "is outside any git repository and may come from a downloaded archive"
-git -C "$dir" ls-files --error-unmatch HANDOVER.md >/dev/null 2>&1 \
-  && skip "is tracked by git: it came with the repository"
+git -C "$dir" cat-file -e HEAD:./HANDOVER.md 2>/dev/null \
+  && skip "is committed in the repository: it came with it"
 
 max=${HANDOVER_MAX_BYTES:-30000}
 case $max in ''|*[!0-9]*) max=30000 ;; esac

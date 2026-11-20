@@ -86,6 +86,24 @@ class GitGuardTest(unittest.TestCase):
             with self.subTest(cmd=cmd):
                 self.assertEqual(self.run_hook(cmd, repo), 2)
 
+    def test_force_create_of_default_branch_blocked(self):
+        repo = make_repo(self.tmp)
+        git(repo, "switch", "-q", "-c", "feat/x")
+        for cmd in ("git switch -C main && git commit -m x",
+                    "git checkout -B main && git commit -m x"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd, repo), 2)
+
+    def test_switch_before_or_does_not_count(self):
+        repo = make_repo(self.tmp)
+        git(repo, "branch", "feat/x")
+        self.assertEqual(self.run_hook("git switch feat/x || git commit -m x", repo), 2)
+
+    def test_git_dir_option_with_space(self):
+        repo = make_repo(self.tmp)
+        self.assertEqual(self.run_hook("git --git-dir .git commit -m x", repo), 2)
+        self.assertEqual(self.run_hook("git --no-pager commit -m x", repo), 2)
+
     def test_checkout_of_a_path_does_not_change_branch(self):
         repo = make_repo(self.tmp)
         git(repo, "switch", "-q", "-c", "feat/x")
@@ -179,9 +197,12 @@ class GitGuardTest(unittest.TestCase):
 
     # HANDOVER.md ----------------------------------------------------------------
 
-    def feature_repo(self, name="repo", when=None):
+    def feature_repo(self, name="repo", when=None, ignore=True):
         repo = make_repo(self.tmp, name)
         git(repo, "switch", "-q", "-c", "feat/x")
+        if ignore:
+            with open(os.path.join(repo, ".git", "info", "exclude"), "a", encoding="utf-8") as f:
+                f.write("HANDOVER.md\n")
         if when is not None:
             git(repo, "commit", "-q", "--allow-empty", "-m", "work", when=when)
         return repo
@@ -222,6 +243,19 @@ class GitGuardTest(unittest.TestCase):
                        check=True, capture_output=True, env=env)
         self.assertEqual(self.run_hook("git commit -m x", repo), 0)
 
+    def test_handover_not_ignored_blocked(self):
+        now = time.time()
+        repo = self.feature_repo(when=now - 3600, ignore=False)
+        touch(os.path.join(repo, "HANDOVER.md"), now)
+        self.assertEqual(self.run_hook("git add -A && git commit -m x", repo), 2)
+
+    def test_staged_handover_blocked_even_if_fresh(self):
+        now = time.time()
+        repo = self.feature_repo(when=now - 3600)
+        touch(os.path.join(repo, "HANDOVER.md"), now)
+        git(repo, "add", "-f", "HANDOVER.md")
+        self.assertEqual(self.run_hook("git commit -m x", repo), 2)
+
     def test_amend_not_checked(self):
         now = time.time()
         repo = self.feature_repo(when=now)
@@ -233,7 +267,7 @@ class GitGuardTest(unittest.TestCase):
         now = time.time()
         repo = self.feature_repo()
         touch(os.path.join(repo, "HANDOVER.md"), now - 3600)
-        git(repo, "add", "HANDOVER.md")
+        git(repo, "add", "-f", "HANDOVER.md")
         git(repo, "commit", "-q", "-m", "team handover", when=now)
         self.assertEqual(self.run_hook("git commit -m x", repo), 0)
 

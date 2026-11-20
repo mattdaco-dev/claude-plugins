@@ -100,8 +100,10 @@ class HookTest(unittest.TestCase):
         path = self.project()
         write(os.path.join(path, "HANDOVER.md"), "SECRET-INSTRUCTION\n")
         subprocess.run(["git", "-C", path, "add", "HANDOVER.md"], check=True)
+        subprocess.run(["git", "-C", path, "-c", "user.email=t@example.com", "-c", "user.name=T",
+                        "commit", "-q", "-m", "handover"], check=True)
         out = self.both(HANDOVER, path)
-        self.assertIn("tracked by git", out)
+        self.assertIn("is committed in the repository", out)
         self.assertNotIn("SECRET-INSTRUCTION", out)
 
     def test_large_handover_truncated(self):
@@ -198,6 +200,15 @@ class HookTest(unittest.TestCase):
         self.assertIn("Apply these rules", self.both(LIVING, path))
         write(os.path.join(path, "CLAUDE.md"), "living-specs: declined\n")
         self.assertEqual(self.both(LIVING, path), "")
+
+    def test_offers_off_keeps_adopted_projects(self):
+        path = self.project()
+        self.assertEqual(self.both(LIVING, path, LIVING_SPECS_OFFERS="0"), "")
+        self.assertEqual(self.both(GLOSSARY, path, LIVING_SPECS_OFFERS="0"), "")
+        write(os.path.join(path, "docs", "specs", "README.md"), "format: living-specs\n")
+        write(os.path.join(path, "docs", "glossary.md"), glossary(2))
+        self.assertIn("Apply these rules", self.both(LIVING, path, LIVING_SPECS_OFFERS="0"))
+        self.assertIn("T0-1", self.both(GLOSSARY, path, LIVING_SPECS_OFFERS="0"))
 
     def test_moved_to_passed_only_when_path_like(self):
         path = self.project()

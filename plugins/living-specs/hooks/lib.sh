@@ -27,6 +27,13 @@ inside_root() {
   return 1
 }
 
+# Succeed when offers are turned off for every project (LIVING_SPECS_OFFERS=0): the hooks then
+# only act on projects that already use living specs or have a glossary.
+offers_off() {
+  case ${LIVING_SPECS_OFFERS:-1} in 0|false|no|off) return 0 ;; esac
+  return 1
+}
+
 # Succeed when the project opted out with "<key>: declined" in one of its CLAUDE files.
 declined() {
   for f in CLAUDE.local.md CLAUDE.md .claude/CLAUDE.md; do

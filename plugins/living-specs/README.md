@@ -103,7 +103,9 @@ Add one of these lines to `CLAUDE.local.md` (kept out of git), `CLAUDE.md` or `.
 - `glossary: declined`: no glossary for this project. Answering "never" to the glossary offer
   writes it to `CLAUDE.local.md`.
 
-To keep the plugin out of most projects, install it at project scope instead
+To stop the offers everywhere, set `LIVING_SPECS_OFFERS=0` (shell profile or the `env` block of
+`settings.json`): the hooks then act only on projects that already keep living specs or a
+glossary. To keep the plugin out of most projects, install it at project scope instead
 (`claude plugin install living-specs@mattdaco --scope project`), only where you want living specs.
 
 When specs move to another repository, `docs/specs/README.md` keeps only `moved_to: <repo or URL>`

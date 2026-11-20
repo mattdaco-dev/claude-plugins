@@ -29,6 +29,7 @@ if [ "$skipped" -gt 0 ]; then
 fi
 if [ "$#" -eq 0 ]; then
   [ "$skipped" -eq 0 ] || exit 0
+  offers_off && exit 0
   is_app || exit 0
   printf 'Business glossary (living-specs plugin): project %s has no docs/glossary.md. When the first business term comes up, offer once in the session to start one (glossary skill, section 2: start, not now, never). Create nothing without that agreement.\n' "$root"
   exit 0

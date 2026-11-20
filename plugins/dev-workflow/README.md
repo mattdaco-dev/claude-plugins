@@ -36,13 +36,14 @@ The three agents exist so that delegated work shows its role in the running-agen
    resume.
 2. Claude keeps it current after each finished task or important decision and before a long or
    risky operation, overwriting it each time.
-3. The file is local: it is never committed and should be listed in `.gitignore` (or
-   `.git/info/exclude`). The SessionStart hook warns when git does not ignore it.
+3. The file is local: it is never committed and must be listed in `.gitignore` (or
+   `.git/info/exclude`). The SessionStart hook warns when git does not ignore it, and `git-guard`
+   blocks commits until it does.
 4. The next session starts with the file injected into context and resumes from it, framed as
    working notes that cannot override you. Above 30,000 bytes (`HANDOVER_MAX_BYTES`) it is
    truncated. The hook looks in the session directory, then at the repository root. It does not
-   inject a `HANDOVER.md` that may come from someone else or point elsewhere (tracked by git,
-   outside any git repository, or a symbolic link): Claude only says it is there.
+   inject a `HANDOVER.md` that may come from someone else or point elsewhere (committed in the
+   repository, outside any git repository, or a symbolic link): Claude only says it is there.
 5. Before each commit, Claude appends one line to the "Since last checkpoint" section (what the
    commit does). `git-guard` checks that `HANDOVER.md` is newer than your last commit, so the resume
    point never lags behind the history, and each update carries content instead of a bare touch.
@@ -55,7 +56,7 @@ The three agents exist so that delegated work shows its role in the running-agen
 |---|---|---|
 | `DEV_WORKFLOW_GUARD_MAIN` | on | `git commit` on a default branch (`main`, `master`, or the branch `origin/HEAD` points to) is blocked. Set to `0` to turn the check off everywhere. A branch created earlier in the same command (`git checkout -b`, `git switch -c`), or a switch to an existing feature branch, lets the commit through; a switch to a default branch is caught. The first commit of a new repository is let through. |
 | `.claude/allow-main-commits` | absent | File at the repo root. When present, commits on the default branch are allowed in that repo only. |
-| `DEV_WORKFLOW_GUARD_HANDOVER` | on | `git commit` is blocked while `HANDOVER.md` (command directory, repo root, or session directory when it is the same repo) is older than your last commit (author date, matched on `user.email`, among the last 200 commits); commits by others brought in by a pull do not count, a rebase keeps the author date, and an `--amend` is not checked. A `HANDOVER.md` tracked by git belongs to the repository and is not checked. Set to `0` to turn it off. No `HANDOVER.md`: no check. |
+| `DEV_WORKFLOW_GUARD_HANDOVER` | on | `git commit` is blocked while `HANDOVER.md` (command directory, repo root, or session directory when it is the same repo) is older than your last commit (author date, matched on `user.email`, among the last 200 commits); commits by others brought in by a pull do not count, a rebase keeps the author date, and an `--amend` is not checked. A `HANDOVER.md` committed in the repository belongs to it and is not checked. Your own `HANDOVER.md` must be ignored by git: while it is not (or is staged), every commit is blocked, so it never ends up in one. Set to `0` to turn it off. No `HANDOVER.md`: no check. |
 | `DEV_WORKFLOW_BLOCK_PUSH` | off | Set to `1` to block every `git push`, so Claude commits locally and leaves pushing to you. |
 
 Set the variables in your shell profile or in the `env` block of `settings.json`. Heredoc bodies

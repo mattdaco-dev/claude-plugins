@@ -36,7 +36,9 @@ import time
 ARG = r"(?:\"[^\"]*\"|'[^']*'|\S+)"
 # "git" as a command word (bare or as a path such as /usr/bin/git), optional
 # global options, then the subcommand.
-GIT = r"(?:^|[\s;&|(])(?:[\w.~/-]*/)?git(?:\s+(?:-[Cc]\s+" + ARG + r"|--[\w-]+(?:=" + ARG + r")?))*\s+"
+GIT = (r"(?:^|[\s;&|(])(?:[\w.~/-]*/)?git(?:\s+(?:-[Cc]\s+" + ARG
+       + r"|--(?:git-dir|work-tree|namespace)\s+" + ARG
+       + r"|--[\w-]+(?:=" + ARG + r")?))*\s+")
 # (?![\w-]): "commit" but not "commit-tree" or "commit-graph".
 PUSH = re.compile(GIT + r"push(?![\w-])")
 COMMIT = re.compile(GIT + r"commit(?![\w-])")
@@ -174,6 +176,9 @@ def branch_after_switch(raw, head, current, directory, defaults):
     """
     branch, created = current, False
     for match in SWITCH.finditer(head):
+        # `switch x || git commit`: the commit only runs if the switch failed.
+        if "||" in head[match.end():]:
+            continue
         try:
             args = shlex.split(raw[match.start(2):match.end(2)])
         except ValueError:
@@ -183,7 +188,9 @@ def branch_after_switch(raw, head, current, directory, defaults):
         flag = next((a for a in args if a in CREATE_FLAGS), None)
         if flag:
             rest = args[args.index(flag) + 1:]
-            branch, created = (rest[0] if rest else None), True
+            name = rest[0] if rest else None
+            # -B/-C main resets main: a commit there is still on main.
+            branch, created = name, name not in defaults
             continue
         targets = [a for a in args if not a.startswith("-")]
         if targets and (targets[0] in defaults or is_branch(directory, targets[0])):
@@ -209,9 +216,17 @@ def find_handover(directory, cwd):
 
 
 def is_tracked(path):
-    """True when git tracks the file: it belongs to the repository, not to you."""
+    """True when the file is in HEAD: it came with the repository.
+
+    Only staged, it is the user's own file about to be committed by mistake.
+    """
     directory, name = os.path.split(path)
-    return git(directory, "ls-files", "--error-unmatch", name) is not None
+    return git(directory, "cat-file", "-e", f"HEAD:./{name}") is not None
+
+
+def is_ignored(path):
+    directory, name = os.path.split(path)
+    return git(directory, "check-ignore", "-q", name) is not None
 
 
 def last_own_commit(directory):
@@ -295,6 +310,14 @@ def main():
         # A HANDOVER.md tracked by git is the team's file, not the user's notes.
         if handover and is_tracked(handover):
             handover = None
+        # The user's notes must never reach a commit: git has to ignore them.
+        if handover and not is_ignored(handover):
+            block(
+                f"{handover} is not ignored by git, so this commit could include "
+                "it: add HANDOVER.md to .gitignore (or .git/info/exclude), unstage "
+                "it if needed (git restore --staged HANDOVER.md), then commit "
+                "again. To turn this check off, set DEV_WORKFLOW_GUARD_HANDOVER=0."
+            )
         last_commit = last_own_commit(directory) if handover else None
         if last_commit and os.path.getmtime(handover) < int(last_commit):
             block(

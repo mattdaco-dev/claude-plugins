@@ -71,7 +71,7 @@ write it afterwards.
   about to be made, and the next step if it changed. No full refresh needed for that. The plugin's
   `git-guard` hook blocks a `git commit` while `HANDOVER.md` is older than your last commit, so this
   line is what lets the commit through: never touch the file without adding it. An
-  `--amend` is not checked. Without `HANDOVER.md`, or with one tracked by git, there is no check;
+  `--amend` is not checked. Without `HANDOVER.md`, or with one committed in the repository, there is no check;
   `DEV_WORKFLOW_GUARD_HANDOVER=0` turns it off.
 - **Fold the journal**: at the next full refresh (finished task, end of a series of commits such as
   the fixes of an audit, session stop), move what matters from "Since last checkpoint" into "Done"
