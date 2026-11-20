@@ -152,7 +152,7 @@ class HookTest(unittest.TestCase):
         os.symlink(os.path.join(self.tmp, "elsewhere"), os.path.join(path, "docs"))
         out = self.both(GLOSSARY, path)
         self.assertNotIn("OUTSIDE", out)
-        self.assertNotIn("has no docs/glossary.md yet", out)
+        self.assertNotIn("has no docs/glossary.md", out)
 
     def test_glossary_injected_as_data(self):
         path = self.project()
@@ -183,9 +183,11 @@ class HookTest(unittest.TestCase):
         self.assertEqual(self.both(GLOSSARY, path), "")
         self.assertEqual(self.both(GLOSSARY, self.project("lib", app=False)), "")
 
-    def test_app_without_glossary_gets_rules(self):
+    def test_app_without_glossary_gets_an_offer(self):
         out = self.both(GLOSSARY, self.project())
-        self.assertIn("has no docs/glossary.md yet", out)
+        self.assertIn("has no docs/glossary.md", out)
+        self.assertIn("offer once", out)
+        self.assertNotIn("Use the glossary terms word for word", out)
 
     # living-specs.sh -------------------------------------------------------------
 

@@ -34,8 +34,9 @@ import time
 
 # One shell word: double-quoted, single-quoted or bare.
 ARG = r"(?:\"[^\"]*\"|'[^']*'|\S+)"
-# "git" as a command word, optional global options, then the subcommand.
-GIT = r"(?:^|[\s;&|(])git(?:\s+(?:-[Cc]\s+" + ARG + r"|--[\w-]+(?:=" + ARG + r")?))*\s+"
+# "git" as a command word (bare or as a path such as /usr/bin/git), optional
+# global options, then the subcommand.
+GIT = r"(?:^|[\s;&|(])(?:[\w.~/-]*/)?git(?:\s+(?:-[Cc]\s+" + ARG + r"|--[\w-]+(?:=" + ARG + r")?))*\s+"
 # (?![\w-]): "commit" but not "commit-tree" or "commit-graph".
 PUSH = re.compile(GIT + r"push(?![\w-])")
 COMMIT = re.compile(GIT + r"commit(?![\w-])")
@@ -67,7 +68,7 @@ def block(message):
 
 
 def strip_text(command):
-    """Blank heredoc bodies and quoted strings, which are data, not commands.
+    """Blank heredoc bodies, quoted strings and comments: data, not commands.
 
     Same length as the input, quotes kept: a match position in the result
     points at the same text in the raw command, so arguments can be read
@@ -86,16 +87,29 @@ def strip_text(command):
         command,
         flags=re.S,
     )
-    return re.sub(r"'[^']*'|\"(?:\\.|[^\"\\])*\"", blank_inside, command)
+    command = re.sub(r"'[^']*'|\"(?:\\.|[^\"\\])*\"", blank_inside, command)
+    # A # that starts a word opens a comment up to the end of the line.
+    return re.sub(r"(?:^|(?<=[\s;&|(]))#[^\n]*", blank, command, flags=re.M)
 
 
-def first_word(raw, start, end):
-    """First shell word of raw[start:end], quotes removed."""
+def first_word(raw, start, end, directory=None):
+    """First shell word of raw[start:end], quotes removed, $VAR expanded.
+
+    $PWD is the directory the command has reached so far; other variables
+    come from the hook's environment. An unknown variable is left as is.
+    """
     try:
         parts = shlex.split(raw[start:end])
     except ValueError:
         return None
-    return parts[0] if parts else None
+    if not parts:
+        return None
+    env = dict(os.environ, PWD=directory) if directory else os.environ
+    return re.sub(
+        r"\$(?:\{(\w+)\}|(\w+))",
+        lambda m: env.get(m.group(1) or m.group(2), m.group(0)),
+        parts[0],
+    )
 
 
 def target_dir(raw, command, cwd):
@@ -108,12 +122,12 @@ def target_dir(raw, command, cwd):
     head_end = commit.start() if commit else len(command)
     directory = cwd
     for match in re.finditer(r"(?:^|[;&|(])\s*cd\s+([^;&|)]+)", command[:head_end]):
-        word = first_word(raw, *match.span(1))
+        word = first_word(raw, *match.span(1), directory)
         if word:
             directory = os.path.join(directory, os.path.expanduser(word))
     c_flag = re.search(r"git\s+-C\s+(" + ARG + r")[^;&|]*\bcommit\b", command)
     if c_flag:
-        word = first_word(raw, *c_flag.span(1))
+        word = first_word(raw, *c_flag.span(1), directory)
         if word:
             directory = os.path.join(directory, os.path.expanduser(word))
     return os.path.normpath(directory)
@@ -252,7 +266,9 @@ def main():
     commit = COMMIT.search(command)
     commit_args = re.split(r"[;&|\n]", command[commit.end():], maxsplit=1)[0]
 
-    if env_flag("DEV_WORKFLOW_GUARD_MAIN", True):
+    # No commit yet: the first commit creates the default branch, let it through.
+    unborn = git(directory, "rev-parse", "--verify", "--quiet", "HEAD") is None
+    if env_flag("DEV_WORKFLOW_GUARD_MAIN", True) and not unborn:
         defaults = default_branches(directory)
         branch, created = branch_after_switch(
             raw,

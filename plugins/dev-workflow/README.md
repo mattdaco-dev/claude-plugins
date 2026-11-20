@@ -53,7 +53,7 @@ The three agents exist so that delegated work shows its role in the running-agen
 
 | Setting | Default | Effect |
 |---|---|---|
-| `DEV_WORKFLOW_GUARD_MAIN` | on | `git commit` on a default branch (`main`, `master`, or the branch `origin/HEAD` points to) is blocked. Set to `0` to turn the check off everywhere. A branch created earlier in the same command (`git checkout -b`, `git switch -c`), or a switch to an existing feature branch, lets the commit through; a switch to a default branch is caught. |
+| `DEV_WORKFLOW_GUARD_MAIN` | on | `git commit` on a default branch (`main`, `master`, or the branch `origin/HEAD` points to) is blocked. Set to `0` to turn the check off everywhere. A branch created earlier in the same command (`git checkout -b`, `git switch -c`), or a switch to an existing feature branch, lets the commit through; a switch to a default branch is caught. The first commit of a new repository is let through. |
 | `.claude/allow-main-commits` | absent | File at the repo root. When present, commits on the default branch are allowed in that repo only. |
 | `DEV_WORKFLOW_GUARD_HANDOVER` | on | `git commit` is blocked while `HANDOVER.md` (command directory, repo root, or session directory when it is the same repo) is older than your last commit (author date, matched on `user.email`, among the last 200 commits); commits by others brought in by a pull do not count, a rebase keeps the author date, and an `--amend` is not checked. A `HANDOVER.md` tracked by git belongs to the repository and is not checked. Set to `0` to turn it off. No `HANDOVER.md`: no check. |
 | `DEV_WORKFLOW_BLOCK_PUSH` | off | Set to `1` to block every `git push`, so Claude commits locally and leaves pushing to you. |

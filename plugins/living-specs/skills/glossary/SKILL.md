@@ -27,11 +27,18 @@ template.
 
 ## 2. Create
 
-Without asking, at the **first business term** met in the session (no empty file created ahead of
-time), if it is missing, that is, if no `docs/glossary*.md` file exists (a split glossary counts,
-section 6): copy [`glossary-template.md`](glossary-template.md) to `docs/glossary.md`, replace
-`PROJECT_NAME`, replace the example row with the term. Report it in the end-of-answer line
-("Glossary: created, 1 term").
+When no `docs/glossary*.md` file exists (a split glossary counts, section 6), **offer** it once in
+the session, at the **first business term** met (no empty file created ahead of time): start, not
+now, or never.
+
+- **Start**: copy [`glossary-template.md`](glossary-template.md) to `docs/glossary.md`, replace
+  `PROJECT_NAME`, replace the example row with the term. Report it in the end-of-answer line
+  ("Glossary: created, 1 term"). From then on, terms are maintained without asking (section 5).
+- **Not now**: do not offer again in this session.
+- **Never**: add the line `glossary: declined` to `CLAUDE.local.md` (create it if needed; it stays
+  out of git), so the hook stays silent in this project.
+
+The user asking for a glossary, or running a skill that writes one, counts as agreement.
 
 `retro-spec`, `functional-spec` (section 2) and `screen-spec` create it if missing, with the terms
 they meet.

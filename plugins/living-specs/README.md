@@ -82,15 +82,15 @@ Two `SessionStart` hooks (POSIX `sh`, sharing `hooks/lib.sh`; `jq` used if prese
   branch before committing). On a project with an out-of-format `docs/specs/`, or an application
   with no specs, injects a one-line hint to offer the format once. Silent otherwise.
 - `glossary.sh`: injects every `docs/glossary*.md` file and the rules for maintaining it, and warns
-  above 150 terms. On an application project with no glossary yet, injects only the rules. Silent
-  elsewhere.
+  above 150 terms. On an application project with no glossary yet, Claude offers once to start one
+  (start, not now, never) and creates nothing without your agreement. Silent elsewhere.
 
 The glossary comes from the repository, so anyone with write access to it writes into Claude's
 context. The hook frames it as project data that cannot override you, and any instruction inside it
 is to be ignored. Above 60,000 bytes (`LIVING_SPECS_GLOSSARY_MAX_BYTES`), it lists the files for
 on-demand reading instead of injecting them. A glossary file that is a symbolic link, or that
-resolves outside the repository, is never read: Claude only says it was skipped. Review a third-party glossary before opening a session
-on the repository, as you would its `CLAUDE.md`.
+resolves outside the repository, is never read: Claude only says it was skipped. Review a
+third-party glossary before opening a session on the repository, as you would its `CLAUDE.md`.
 
 A project "looks like an application" when its root has a build or dependency manifest
 (`package.json`, `pom.xml`, `pyproject.toml`, `go.mod`, `Cargo.toml`, etc.) or an `index.html`.
@@ -100,7 +100,11 @@ A project "looks like an application" when its root has a build or dependency ma
 Add one of these lines to `CLAUDE.local.md` (kept out of git), `CLAUDE.md` or `.claude/CLAUDE.md`:
 
 - `living-specs: declined`: no spec writing and no format offer for this project.
-- `glossary: declined`: no glossary for this project.
+- `glossary: declined`: no glossary for this project. Answering "never" to the glossary offer
+  writes it to `CLAUDE.local.md`.
+
+To keep the plugin out of most projects, install it at project scope instead
+(`claude plugin install living-specs@mattdaco --scope project`), only where you want living specs.
 
 When specs move to another repository, `docs/specs/README.md` keeps only `moved_to: <repo or URL>`
 and nothing is written there any more.

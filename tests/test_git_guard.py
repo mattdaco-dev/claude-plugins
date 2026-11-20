@@ -105,6 +105,20 @@ class GitGuardTest(unittest.TestCase):
         other = make_repo(self.tmp, "other", branch="develop")
         self.assertEqual(self.run_hook("git commit -m x", other), 0)
 
+    def test_first_commit_of_new_repo_allowed(self):
+        repo = os.path.join(self.tmp, "fresh")
+        os.makedirs(repo)
+        git(repo, "init", "-q", "-b", "main")
+        self.assertEqual(self.run_hook("git commit -m init", repo), 0)
+
+    def test_git_by_path_and_variables_seen(self):
+        repo = make_repo(self.tmp)
+        feature = make_repo(self.tmp, "feature")
+        git(feature, "switch", "-q", "-c", "feat/x")
+        self.assertEqual(self.run_hook("/usr/bin/git commit -m x", repo), 2)
+        self.assertEqual(self.run_hook('cd "$PWD" && git commit -m x', repo), 2)
+        self.assertEqual(self.run_hook(f'cd "$PWD/../{os.path.basename(repo)}" && git commit -m x', feature), 2)
+
     def test_marker_allows_main(self):
         repo = make_repo(self.tmp)
         os.makedirs(os.path.join(repo, ".claude"))
@@ -158,6 +172,7 @@ class GitGuardTest(unittest.TestCase):
     def test_non_commit_commands_ignored(self):
         repo = make_repo(self.tmp)
         for cmd in ("git status", "git log -1", 'echo "git commit"', "ls",
+                    "git status # then git commit", "# git commit\nls",
                     "git commit-tree HEAD^{tree} -m x", "git commit-graph write"):
             with self.subTest(cmd=cmd):
                 self.assertEqual(self.run_hook(cmd, repo), 0)
