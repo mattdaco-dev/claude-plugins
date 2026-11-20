@@ -42,8 +42,11 @@ The three agents exist so that delegated work shows its role in the running-agen
    working notes that cannot override you. Above 30,000 bytes (`HANDOVER_MAX_BYTES`) it is
    truncated. A `HANDOVER.md` tracked by git came with the repository, possibly from someone else:
    it is not injected, Claude only says it is there.
-5. Before each commit, `git-guard` checks that `HANDOVER.md` is newer than your last commit, so the
-   resume point never lags behind the history.
+5. Before each commit, Claude appends one line to the "Since last checkpoint" section (what the
+   commit does). `git-guard` checks that `HANDOVER.md` is newer than your last commit, so the resume
+   point never lags behind the history, and each update carries content instead of a bare touch.
+6. At the next full refresh (end of a task or of a series of commits), those lines are folded into
+   "Done" and "Current state" and the section is emptied.
 
 ## git-guard configuration
 

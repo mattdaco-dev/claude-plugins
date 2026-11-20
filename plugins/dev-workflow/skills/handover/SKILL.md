@@ -1,14 +1,15 @@
 ---
 name: handover
-description: Write or refresh HANDOVER.md, a local resume point capturing where work stands so a fresh session can continue. Use to checkpoint progress, after a finished task or an important decision, before a long or risky operation, when pausing or stopping work, or when the user says "/handover", "checkpoint", "save state", "we stop here", "sauvegarde l'état", "on s'arrête là".
+description: Write or refresh HANDOVER.md, a local resume point capturing where work stands so a fresh session can continue. Use to checkpoint progress, after a finished task or an important decision, before a long or risky operation, before a commit (one journal line), when pausing or stopping work, or when the user says "/handover", "checkpoint", "save state", "we stop here", "sauvegarde l'état", "on s'arrête là".
 ---
 
 Maintain `HANDOVER.md` at the root of the working directory as the single source of truth for
 resuming work in a fresh session. The plugin's SessionStart hook injects it into the next session,
 which resumes from it.
 
-**Overwrite** the file each time (don't append) so it stays a concise, current snapshot, not a log.
-Keep it factual and short: it is a resume point, not a report. Write its content in the language
+A **full refresh overwrites** the file so it stays a concise, current snapshot, not a log. The one
+exception is the "Since last checkpoint" section: before each commit, append one line there (see
+"Before each commit"). Keep it factual and short: it is a resume point, not a report. Write its content in the language
 the user works in; the template below gives the structure.
 
 ## What to capture
@@ -41,6 +42,9 @@ Where things stand; what works and what does not yet.
 
 ## Resume / test
 Commands to restart, build, test.
+
+## Since last checkpoint
+- <HH:mm> <commit subject>: <what it changes>; next: <only if the next step changed>
 ```
 
 Timestamp in `YYYY-MM-DD HH:mm:ss` format, local time, obtained with `date '+%Y-%m-%d %H:%M:%S'`:
@@ -63,7 +67,11 @@ write it afterwards.
   needed. Exception: a project where nothing may be written (the "nothing in the repo" mode of
   `code-audits:legacy-takeover` if the code-audits plugin is installed, a repo that is not yours):
   ignore it through `.git/info/exclude`, which stays local and changes no tracked file.
-- **Before each commit**: the plugin's `git-guard` hook blocks a `git commit` while `HANDOVER.md`
-  (command directory, repo root or session directory) is older than the last commit. Refresh it,
-  then run the commit again. Without `HANDOVER.md`, there is no check. The check can be turned off
-  with `DEV_WORKFLOW_GUARD_HANDOVER=0`.
+- **Before each commit**: append one line under "Since last checkpoint" describing the commit
+  about to be made, and the next step if it changed. No full refresh needed for that. The plugin's
+  `git-guard` hook blocks a `git commit` while `HANDOVER.md` is older than your last commit, so this
+  line is what lets the commit through: never touch the file without adding it. Without
+  `HANDOVER.md`, there is no check; `DEV_WORKFLOW_GUARD_HANDOVER=0` turns it off.
+- **Fold the journal**: at the next full refresh (finished task, end of a series of commits such as
+  the fixes of an audit, session stop), move what matters from "Since last checkpoint" into "Done"
+  and "Current state", drop the rest, and leave the section empty.

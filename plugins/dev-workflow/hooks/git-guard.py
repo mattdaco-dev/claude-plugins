@@ -244,9 +244,10 @@ def main():
         last_commit = last_own_commit(directory) if handover else None
         if last_commit and os.path.getmtime(handover) < int(last_commit):
             block(
-                f"{handover} has not been updated since the last commit: refresh "
-                "it (handover skill), then commit again. To turn this check off, "
-                "set DEV_WORKFLOW_GUARD_HANDOVER=0."
+                f"{handover} has not been updated since your last commit: add one "
+                "line under 'Since last checkpoint' saying what this commit does "
+                "(handover skill), then commit again. To turn this check off, set "
+                "DEV_WORKFLOW_GUARD_HANDOVER=0."
             )
 
 

@@ -226,5 +226,6 @@ go into the roadmap (see `maintainability-audit` §11). For each one:
 
 A full run can span several sessions. **Keep a running checkpoint in `HANDOVER.md`** (with
 `dev-workflow:handover` if the `dev-workflow` plugin is installed; otherwise skip): zones done and
-remaining, collection follow-ups pending, findings waiting for a decision. A new session picks up
-exactly where the previous one stopped.
+remaining, collection follow-ups pending, findings waiting for a decision. Each fix commit adds its
+journal line; at the end of the run, the final refresh folds them into the summary. A new session
+picks up exactly where the previous one stopped.

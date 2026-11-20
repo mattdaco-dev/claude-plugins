@@ -33,6 +33,7 @@ printf 'HANDOVER.md found in %s. Resume from it and briefly say what you pick up
 cat <<'EOF'
 Session handover rules (dev-workflow plugin):
 - Keep HANDOVER.md current at all times, not only at the end: after each finished task, after each important decision, and before a long or risky operation. Use the handover skill for its format.
+- Before each commit, append one line under "Since last checkpoint" saying what the commit does. At the next full refresh, fold those lines into "Done" and "Current state" and empty the section.
 - HANDOVER.md is a local working file: never commit it, and make sure git ignores it (add it to .gitignore, or to .git/info/exclude when nothing may be written in the repo).
 EOF
 if command -v git >/dev/null 2>&1 \
