@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """PreToolUse hook (matcher: Bash) guarding git commands. Configurable.
 
-- git commit on a default branch (main, master, or the branch origin/HEAD
-  points to): blocked, unless the repo holds a .claude/allow-main-commits
+- git commit, revert or cherry-pick on a default branch (main, master, or
+  the branch origin/HEAD points to): blocked, unless the repo holds a .claude/allow-main-commits
   marker, or DEV_WORKFLOW_GUARD_MAIN=0. A checkout/switch earlier in the
   same command counts: creating a branch (checkout -b, switch -c) or
-  switching to an existing feature branch lets the commit through,
-  switching to a default branch does not.
+  switching to an existing feature branch, chained with &&, lets the commit
+  through; switching to a default branch does not. git merge is left alone:
+  pulling or merging into the default branch is routine.
 - git commit while HANDOVER.md (command dir, repo root, or session cwd when
   it is the same repo) is older than the author date of the user's last
   commit: blocked, unless DEV_WORKFLOW_GUARD_HANDOVER=0. Commits by others
@@ -41,7 +42,8 @@ GIT = (r"(?:^|[\s;&|(])(?:[\w.~/-]*/)?git(?:\s+(?:-[Cc]\s+" + ARG
        + r"|--[\w-]+(?:=" + ARG + r")?))*\s+")
 # (?![\w-]): "commit" but not "commit-tree" or "commit-graph".
 PUSH = re.compile(GIT + r"push(?![\w-])")
-COMMIT = re.compile(GIT + r"commit(?![\w-])")
+# Subcommands that add a commit to the current branch.
+WRITES = re.compile(GIT + r"(commit|revert|cherry-pick)(?![\w-])")
 SWITCH = re.compile(GIT + r"(checkout|switch)\b([^;&|\n)]*)")
 CREATE_FLAGS = {"-b", "-B", "-c", "-C", "--orphan", "--create", "--force-create"}
 DEFAULT_BRANCHES = {"main", "master"}
@@ -120,14 +122,16 @@ def target_dir(raw, command, cwd):
     `command` is strip_text(raw): matches are found there, so a `cd` inside a
     quoted string is ignored, and the argument is read back from `raw`.
     """
-    commit = COMMIT.search(command)
+    commit = WRITES.search(command)
     head_end = commit.start() if commit else len(command)
     directory = cwd
     for match in re.finditer(r"(?:^|[;&|(])\s*cd\s+([^;&|)]+)", command[:head_end]):
         word = first_word(raw, *match.span(1), directory)
         if word:
             directory = os.path.join(directory, os.path.expanduser(word))
-    c_flag = re.search(r"git\s+-C\s+(" + ARG + r")[^;&|]*\bcommit\b", command)
+    c_flag = re.search(
+        r"git\s+-C\s+(" + ARG + r")[^;&|]*\b(?:commit|revert|cherry-pick)\b", command
+    )
     if c_flag:
         word = first_word(raw, *c_flag.span(1), directory)
         if word:
@@ -173,12 +177,15 @@ def branch_after_switch(raw, head, current, directory, defaults):
     creates a branch. A switch to a default branch or to an existing branch
     moves the commit there; a checkout of a path or of an unknown ref leaves
     the current branch unchanged.
+
+    A switch that lets the commit through counts only when chained with &&:
+    after ;, || or a newline, the commit also runs when the switch failed,
+    so it may land on the current branch. A switch to a default branch
+    counts whatever the chaining (blocking is the safe side).
     """
     branch, created = current, False
     for match in SWITCH.finditer(head):
-        # `switch x || git commit`: the commit only runs if the switch failed.
-        if "||" in head[match.end():]:
-            continue
+        chained = re.match(r"\s*&&", head[match.end():]) is not None
         try:
             args = shlex.split(raw[match.start(2):match.end(2)])
         except ValueError:
@@ -190,10 +197,15 @@ def branch_after_switch(raw, head, current, directory, defaults):
             rest = args[args.index(flag) + 1:]
             name = rest[0] if rest else None
             # -B/-C main resets main: a commit there is still on main.
-            branch, created = name, name not in defaults
+            if name in defaults:
+                branch, created = name, False
+            elif chained:
+                branch, created = name, True
             continue
         targets = [a for a in args if not a.startswith("-")]
-        if targets and (targets[0] in defaults or is_branch(directory, targets[0])):
+        if not targets:
+            continue
+        if targets[0] in defaults or (chained and is_branch(directory, targets[0])):
             branch, created = targets[0], False
     return branch, created
 
@@ -271,15 +283,19 @@ def main():
             "commit locally and ask the user to push."
         )
 
-    if not COMMIT.search(command):
+    write = WRITES.search(command)
+    if not write:
+        return
+    subcommand = write.group(1)
+    write_args = re.split(r"[;&|\n]", command[write.end():], maxsplit=1)[0]
+    # revert/cherry-pick --abort or --quit undo, they add nothing.
+    if subcommand != "commit" and re.search(r"(?:^|\s)--(?:abort|quit)\b", write_args):
         return
 
     directory = target_dir(raw, command, cwd)
     if not os.path.isdir(directory):
         return
 
-    commit = COMMIT.search(command)
-    commit_args = re.split(r"[;&|\n]", command[commit.end():], maxsplit=1)[0]
 
     # No commit yet: the first commit creates the default branch, let it through.
     unborn = git(directory, "rev-parse", "--verify", "--quiet", "HEAD") is None
@@ -287,7 +303,7 @@ def main():
         defaults = default_branches(directory)
         branch, created = branch_after_switch(
             raw,
-            command[:commit.start()],
+            command[:write.start()],
             git(directory, "symbolic-ref", "--short", "HEAD"),
             directory,
             defaults,
@@ -296,7 +312,7 @@ def main():
         allows_main = root and os.path.isfile(os.path.join(root, MAIN_COMMITS_MARKER))
         if branch in defaults and not created and not allows_main:
             block(
-                f"Commit on '{branch}' is blocked: create a <type>/<slug> branch "
+                f"git {subcommand} on '{branch}' is blocked: create a <type>/<slug> branch "
                 "first (for example feat/my-change), then commit there. To allow "
                 "commits on the default branch in this repo, add a "
                 ".claude/allow-main-commits file; to turn this check off, set "
@@ -304,7 +320,10 @@ def main():
             )
 
     # --amend rewrites the last commit instead of adding one: no new line due.
-    amend = re.search(r"(?:^|\s)--amend\b", commit_args)
+    # The HANDOVER.md check only concerns new commits made with git commit.
+    if subcommand != "commit":
+        return
+    amend = re.search(r"(?:^|\s)--amend\b", write_args)
     if env_flag("DEV_WORKFLOW_GUARD_HANDOVER", True) and not amend:
         handover = find_handover(directory, cwd)
         # A HANDOVER.md tracked by git is the team's file, not the user's notes.

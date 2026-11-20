@@ -99,6 +99,30 @@ class GitGuardTest(unittest.TestCase):
         git(repo, "branch", "feat/x")
         self.assertEqual(self.run_hook("git switch feat/x || git commit -m x", repo), 2)
 
+    def test_switch_counts_only_when_chained_with_and(self):
+        repo = make_repo(self.tmp)
+        git(repo, "branch", "feat/x")
+        for cmd in ("git checkout feat/x; git commit -m x",
+                    "git switch feat/x || true; git commit -m x",
+                    "git switch -c feat/y\ngit commit -m x"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd, repo), 2)
+
+    def test_revert_and_cherry_pick_on_main_blocked(self):
+        repo = make_repo(self.tmp)
+        for cmd in ("git revert HEAD", "git cherry-pick abc123", "git revert --no-edit HEAD"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd, repo), 2)
+        for cmd in ("git revert --abort", "git cherry-pick --quit", "git merge feat/x"):
+            with self.subTest(cmd=cmd):
+                self.assertEqual(self.run_hook(cmd, repo), 0)
+
+    def test_revert_on_feature_branch_skips_handover_check(self):
+        now = time.time()
+        repo = self.feature_repo(when=now)
+        touch(os.path.join(repo, "HANDOVER.md"), now - 3600)
+        self.assertEqual(self.run_hook("git revert HEAD", repo), 0)
+
     def test_git_dir_option_with_space(self):
         repo = make_repo(self.tmp)
         self.assertEqual(self.run_hook("git --git-dir .git commit -m x", repo), 2)

@@ -5,7 +5,8 @@ for Claude Code.
 
 ## Requirements
 
-`python3` (3.9 or later) for `git-guard`, `sh` and `git` for the hooks. `jq` is used if present.
+`python3` (3.9 or later) for `git-guard`, which is skipped silently without it; `sh` and `git` for
+the hooks. `jq` is used if present.
 
 ## Install
 
@@ -54,7 +55,7 @@ The three agents exist so that delegated work shows its role in the running-agen
 
 | Setting | Default | Effect |
 |---|---|---|
-| `DEV_WORKFLOW_GUARD_MAIN` | on | `git commit` on a default branch (`main`, `master`, or the branch `origin/HEAD` points to) is blocked. Set to `0` to turn the check off everywhere. A branch created earlier in the same command (`git checkout -b`, `git switch -c`), or a switch to an existing feature branch, lets the commit through; a switch to a default branch is caught. The first commit of a new repository is let through. |
+| `DEV_WORKFLOW_GUARD_MAIN` | on | `git commit`, `git revert` and `git cherry-pick` on a default branch (`main`, `master`, or the branch `origin/HEAD` points to) are blocked; `git merge` and `git pull` are left alone. Set to `0` to turn the check off everywhere. A branch created earlier in the same command (`git checkout -b`, `git switch -c`), or a switch to an existing feature branch, lets the commit through when chained with `&&` (after `;` or `||` the commit would also run if the switch failed); a switch to a default branch is caught. The first commit of a new repository is let through. |
 | `.claude/allow-main-commits` | absent | File at the repo root. When present, commits on the default branch are allowed in that repo only. |
 | `DEV_WORKFLOW_GUARD_HANDOVER` | on | `git commit` is blocked while `HANDOVER.md` (command directory, repo root, or session directory when it is the same repo) is older than your last commit (author date, matched on `user.email`, among the last 200 commits); commits by others brought in by a pull do not count, a rebase keeps the author date, and an `--amend` is not checked. A `HANDOVER.md` committed in the repository belongs to it and is not checked. Your own `HANDOVER.md` must be ignored by git: while it is not (or is staged), every commit is blocked, so it never ends up in one. Set to `0` to turn it off. No `HANDOVER.md`: no check. |
 | `DEV_WORKFLOW_BLOCK_PUSH` | off | Set to `1` to block every `git push`, so Claude commits locally and leaves pushing to you. |
