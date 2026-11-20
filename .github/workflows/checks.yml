@@ -9,20 +9,32 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        # 3.9: the python3 shipped with macOS, which runs the hooks for many users.
-        python-version: ["3.9", "3.x"]
+        include:
+          # Latest Python on Linux (dash as sh, GNU sed).
+          - os: ubuntu-latest
+            python: python3
+            setup: "3.x"
+          # The python3 shipped with macOS (3.9), which runs the hooks for many
+          # users, with BSD sed. setup-python no longer builds 3.9 for recent
+          # Ubuntu runners, so it is tested where it actually lives.
+          - os: macos-latest
+            python: /usr/bin/python3
+    runs-on: ${{ matrix.os }}
     steps:
       # Actions pinned by commit SHA, tag in the comment.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - if: matrix.setup
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: ${{ matrix.setup }}
+      - name: Python version
+        run: ${{ matrix.python }} --version
       - name: Repository consistency
-        run: python3 scripts/validate.py
+        run: ${{ matrix.python }} scripts/validate.py
       - name: Typography
-        run: python3 scripts/typo-lint.py .
+        run: ${{ matrix.python }} scripts/typo-lint.py .
       - name: Tests
-        run: python3 -m unittest discover -s tests
+        run: ${{ matrix.python }} -m unittest discover -s tests
